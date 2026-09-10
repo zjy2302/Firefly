@@ -1,18 +1,10 @@
 ---
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
 import { Icon } from "astro-icon/components";
-
-// 你的网易云歌单 ID
-const PLAYLIST_ID = "6864596707";
-// Meting API（:server / :type / :id / :r 会被自动替换）
-const METING_API = "https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r";
-// 播放器主题色
-const THEME = "#2f9e8f";
 ---
 
 <MainGridLayout title="音乐" description="我的网易云歌单">
 
-  <!-- APlayer 样式（放在布局内部，位置才合法） -->
   <link rel="stylesheet" href="/assets/vendor/APlayer.min.css" />
 
   <div class="flex w-full rounded-(--radius-large) overflow-hidden relative">
@@ -28,21 +20,8 @@ const THEME = "#2f9e8f";
         点播放开始 ｜ 点歌词按钮看词（含翻译）｜ 下方是完整歌单列表
       </p>
 
-      <div class="music-player-shell">
-        <meting-js
-          server="netease"
-          type="playlist"
-          id={PLAYLIST_ID}
-          api={METING_API}
-          theme={THEME}
-          order="list"
-          preload="none"
-          mutex="true"
-          lrc-type="2"
-          list-folded="false"
-          list-max-height="280px"
-          storage-name="firefly-music-page"></meting-js>
-      </div>
+      <!-- 播放器会挂到这里 -->
+      <div id="music-shell" class="music-player-shell"></div>
 
       <div class="mt-8 pt-6 border-t border-(--line-divider)">
         <a
@@ -59,10 +38,77 @@ const THEME = "#2f9e8f";
     </div>
   </div>
 
+  <!-- 依次探测可用接口，再用第一个可用的渲染播放器 -->
+  <script is:inline>
+    (function () {
+      var SHELL_ID = "music-shell";
+      var PLAYLIST_ID = "6864596707";
+      var THEME = "#2f9e8f";
+
+      var APIS = [
+        "https://api.injahow.cn/meting/?server=:server&type=:type&id=:id",
+        "https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id",
+        "https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r"
+      ];
+
+      function testUrl(api) {
+        return api
+          .replace(":server", "netease")
+          .replace(":type", "playlist")
+          .replace(":id", PLAYLIST_ID)
+          .replace(":r", Math.random());
+      }
+
+      function mount(api) {
+        var shell = document.getElementById(SHELL_ID);
+        if (!shell) return;
+        var el = document.createElement("meting-js");
+        el.setAttribute("server", "netease");
+        el.setAttribute("type", "playlist");
+        el.setAttribute("id", PLAYLIST_ID);
+        el.setAttribute("api", api);
+        el.setAttribute("theme", THEME);
+        el.setAttribute("order", "list");
+        el.setAttribute("preload", "none");
+        el.setAttribute("mutex", "true");
+        el.setAttribute("lrc-type", "2");
+        el.setAttribute("list-folded", "false");
+        el.setAttribute("list-max-height", "280px");
+        el.setAttribute("storage-name", "firefly-music-page");
+        shell.appendChild(el);
+      }
+
+      function tryAt(i) {
+        if (i >= APIS.length) {
+          var shell = document.getElementById(SHELL_ID);
+          if (shell) {
+            shell.innerHTML =
+              '<div style="padding:20px;border-radius:12px;background:rgba(127,127,127,.12);color:#999;text-align:center">音乐接口暂时不可用，稍后再试，或点下方按钮去 Mineradio 播放。</div>';
+          }
+          return;
+        }
+        fetch(testUrl(APIS[i]))
+          .then(function (res) {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
+            mount(APIS[i]);
+          })
+          .catch(function () {
+            tryAt(i + 1);
+          });
+      }
+
+      tryAt(0);
+    })();
+  </script>
+
   <!-- 防止和侧边栏播放器同时出声 -->
   <script is:inline>
-    document.addEventListener('play', function (e) {
-      var all = document.querySelectorAll('audio');
+    document.addEventListener("play", function (e) {
+      var all = document.querySelectorAll("audio");
       for (var i = 0; i < all.length; i++) {
         if (all[i] !== e.target) { try { all[i].pause(); } catch (err) {} }
       }
