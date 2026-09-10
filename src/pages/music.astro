@@ -1,32 +1,49 @@
 ---
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
-import MusicPlayer from "@/components/features/MusicPlayer.astro";
 import { Icon } from "astro-icon/components";
+
+// 你的网易云歌单 ID
+const PLAYLIST_ID = "6864596707";
+// Meting API（:server / :type / :id / :r 会被自动替换）
+const METING_API = "https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r";
+// 播放器主题色（想换就改这个色值）
+const THEME = "#2f9e8f";
 ---
 
 <MainGridLayout title="音乐" description="我的网易云歌单">
   <div class="flex w-full rounded-(--radius-large) overflow-hidden relative">
     <div class="card-base z-10 px-6 py-8 relative w-full">
 
-      <!-- 页面标题 -->
-      <div class="flex items-center gap-3 mb-4">
+      <!-- 标题 -->
+      <div class="flex items-center gap-3 mb-2">
         <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
           <Icon name="material-symbols:music-note" class="text-[1.5rem]"></Icon>
         </div>
         <h1 class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">我的歌单</h1>
       </div>
-
-      <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-8">
-        点播放按钮开始播放 ｜ 右上角字幕图标看歌词 ｜ 右下角列表图标展开完整歌单
+      <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-6">
+        点播放开始 ｜ 点歌词按钮看词（含翻译）｜ 下方是完整歌单列表
       </p>
 
-      <!-- 播放器：和侧边栏那个是同一个组件，歌单来自 musicConfig.ts 里的配置 -->
-      <div class="max-w-2xl mx-auto rounded-2xl bg-neutral-50 dark:bg-neutral-900/40 border border-(--line-divider) p-5">
-        <MusicPlayer id="music-page-player" />
+      <!-- 播放器 -->
+      <div class="music-player-shell">
+        <meting-js
+          server="netease"
+          type="playlist"
+          id={PLAYLIST_ID}
+          api={METING_API}
+          theme={THEME}
+          order="list"
+          preload="none"
+          mutex="true"
+          lrc-type="2"
+          list-folded="false"
+          list-max-height="280px"
+          storage-name="firefly-music-page"></meting-js>
       </div>
 
       <!-- 保留 Mineradio 跳转 -->
-      <div class="mt-8 pt-6 border-t border-(--line-divider) flex flex-wrap items-center gap-3">
+      <div class="mt-8 pt-6 border-t border-(--line-divider)">
         <a
           href="https://mineradio.art/"
           target="_blank"
@@ -41,3 +58,39 @@ import { Icon } from "astro-icon/components";
     </div>
   </div>
 </MainGridLayout>
+
+<!-- APlayer 样式（本站文件，不走 CDN） -->
+<link rel="stylesheet" href="/assets/vendor/APlayer.min.css" />
+
+<!-- 防止和侧边栏播放器同时出声 -->
+<script is:inline>
+  document.addEventListener('play', function (e) {
+    var all = document.querySelectorAll('audio');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i] !== e.target) { try { all[i].pause(); } catch (err) {} }
+    }
+  }, true);
+</script>
+
+<!-- 顺序不能颠倒：先 APlayer，再 MetingJS -->
+<script is:inline src="/assets/vendor/APlayer.min.js"></script>
+<script is:inline src="/assets/vendor/Meting.min.js"></script>
+
+<style is:global>
+  /* 去掉 APlayer 默认外边距 */
+  .music-player-shell .aplayer { margin: 0; border-radius: 12px; }
+
+  /* 深色模式适配 */
+  :root.dark .aplayer { background: #262626; color: #e5e5e5; }
+  :root.dark .aplayer .aplayer-info { border-bottom-color: #3a3a3a; }
+  :root.dark .aplayer .aplayer-music .aplayer-title { color: #f5f5f5; }
+  :root.dark .aplayer .aplayer-music .aplayer-author,
+  :root.dark .aplayer .aplayer-time { color: #a3a3a3; }
+  :root.dark .aplayer .aplayer-list ol li { border-top-color: #333; }
+  :root.dark .aplayer .aplayer-list ol li:hover,
+  :root.dark .aplayer .aplayer-list ol li.aplayer-list-light { background: #333; }
+  :root.dark .aplayer .aplayer-list ol li .aplayer-list-index,
+  :root.dark .aplayer .aplayer-list ol li .aplayer-list-author { color: #a3a3a3; }
+  :root.dark .aplayer .aplayer-lrc p { color: #a3a3a3; }
+  :root.dark .aplayer .aplayer-lrc p.aplayer-lrc-current { color: #f5f5f5; }
+</style>
