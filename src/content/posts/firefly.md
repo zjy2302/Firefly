@@ -2,8 +2,8 @@
 title: 每一次你字里有雨我就跟着淋漓
 published: 2026-09-10
 pinned: true
-description:“悲伤来的时候，我只想一个人坐着。你不要来。你一来，我的悲伤就不是悲伤了，它变成了一件事。一件事就要解决。可我不需要它解决。我需要它存在。”
-tags: [随笔, 情绪，文字 ]
+description:悲伤来的时候，我只想一个人坐着。你不要来。你一来，我的悲伤就不是悲伤了，它变成了一件事。一件事就要解决。可我不需要它解决。我需要它存在。
+tags: [随笔, 情绪,文字 ]
 category: 生活
 image: ./images/firefly2.avif
 slug: rain-words
