@@ -6,11 +6,21 @@ import { Icon } from "astro-icon/components";
 <MainGridLayout title="音乐" description="我的网易云歌单">
   <div id="music-page" class="flex w-full flex-col gap-4">
 
+    <!-- 歌单切换 -->
+    <div class="card-base relative w-full px-6 py-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400">
+          <Icon name="material-symbols:queue-music" class="text-lg" />
+          歌单
+        </span>
+        <div id="mp-tabs" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+
     <!-- 播放区 -->
     <div class="card-base relative w-full px-6 py-8">
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-[300px_1fr] lg:items-start">
 
-        <!-- 左：封面 + 控制 -->
         <div class="flex flex-col items-center">
           <div class="relative h-56 w-56 shrink-0">
             <div class="absolute inset-0 flex items-center justify-center rounded-2xl bg-(--primary)/10">
@@ -23,7 +33,6 @@ import { Icon } from "astro-icon/components";
           <h2 id="mp-title" class="mt-5 line-clamp-2 text-center text-xl font-bold text-neutral-900 dark:text-neutral-100">未播放</h2>
           <p id="mp-artist" class="mt-1 text-center text-sm text-neutral-500 dark:text-neutral-400">—</p>
 
-          <!-- 进度条 -->
           <div class="mt-6 w-full">
             <div id="mp-progress" class="group relative h-1.5 w-full cursor-pointer rounded-full bg-neutral-300/60 dark:bg-neutral-600/50">
               <div id="mp-bar" class="absolute left-0 top-0 h-full w-0 rounded-full bg-(--primary)"></div>
@@ -35,7 +44,6 @@ import { Icon } from "astro-icon/components";
             </div>
           </div>
 
-          <!-- 控制按钮 -->
           <div class="mt-5 flex items-center gap-2">
             <button id="mp-mode" type="button" class="p-2 text-neutral-400 transition-colors hover:text-(--primary)" title="播放模式">
               <Icon name="material-symbols:repeat-rounded" class="mp-icon-mode-list text-xl" />
@@ -62,7 +70,6 @@ import { Icon } from "astro-icon/components";
             </button>
           </div>
 
-          <!-- 音量 -->
           <div class="mt-4 flex w-48 items-center gap-2">
             <input id="mp-volume" type="range" min="0" max="100" step="1" value="70" class="w-full accent-(--primary)" aria-label="音量" />
           </div>
@@ -70,7 +77,6 @@ import { Icon } from "astro-icon/components";
           <p id="mp-msg" class="mt-3 min-h-5 text-center text-xs text-neutral-400"></p>
         </div>
 
-        <!-- 右：歌词 -->
         <div class="flex min-w-0 flex-col">
           <div class="mb-3 flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
             <Icon name="material-symbols:lyrics-rounded" class="text-lg" />
@@ -86,12 +92,12 @@ import { Icon } from "astro-icon/components";
       </div>
     </div>
 
-    <!-- 歌单 -->
+    <!-- 歌单列表 -->
     <div class="card-base relative w-full px-6 py-6">
       <div class="mb-4 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <Icon name="mdi:playlist-music" class="text-2xl text-(--primary)" />
-          <h2 class="text-lg font-bold text-neutral-900 dark:text-neutral-100">歌单</h2>
+          <h2 class="text-lg font-bold text-neutral-900 dark:text-neutral-100">歌曲列表</h2>
         </div>
         <span id="mp-count" class="text-xs text-neutral-400"></span>
       </div>
@@ -117,6 +123,26 @@ import { Icon } from "astro-icon/components";
       var root = document.getElementById('music-page');
       if (!root || root.dataset.ready === '1') return;
 
+      /* ============================================================
+         ↓↓↓ 想加歌单就在这里加，一行一个 ↓↓↓
+         name 显示的名字，id 是网易云歌单 ID（歌单要设为公开）
+         ============================================================ */
+      var PLAYLISTS = [
+        { name: '我的歌单', id: '6864596707' }
+        // { name: '深夜emo', id: '1234567890' },
+        // { name: '工作学习', id: '9876543210' }
+      ];
+
+      // Meting 接口（依次尝试，哪个通用哪个）
+      var APIS = [
+        'https://api.injahow.cn/meting/?server=:server&type=:type&id=:id',
+        'https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id',
+        'https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r'
+      ];
+
+      // 大封面清晰度（可改 300y300 / 500y500 / 1024y1024）
+      var COVER_SIZE = '500y500';
+
       var tries = 0;
       function boot() {
         var mgr = window.__fireflyMusic;
@@ -136,6 +162,7 @@ import { Icon } from "astro-icon/components";
         var elMode = $('mp-mode'), elMute = $('mp-mute'), elVolume = $('mp-volume');
         var elLrc = $('mp-lrc'), elLrcBox = $('mp-lrc-box');
         var elList = $('mp-list'), elCount = $('mp-count'), elMsg = $('mp-msg');
+        var elTabs = $('mp-tabs');
         var iPlay = root.querySelector('.mp-icon-play'), iPause = root.querySelector('.mp-icon-pause');
         var iModeList = root.querySelector('.mp-icon-mode-list');
         var iModeOne = root.querySelector('.mp-icon-mode-one');
@@ -143,7 +170,7 @@ import { Icon } from "astro-icon/components";
         var iVolOn = root.querySelector('.mp-icon-vol-on'), iVolOff = root.querySelector('.mp-icon-vol-off');
 
         var lrcKey = '', listKey = '', lastLrcIdx = -2, seeking = false;
-        var listeners = [];
+        var listeners = [], coverCache = {}, currentPic = '';
 
         function on(name, fn) { window.addEventListener(name, fn); listeners.push([name, fn]); }
         function esc(s) {
@@ -152,6 +179,89 @@ import { Icon } from "astro-icon/components";
         }
         function toggle(el, show) { if (el) el.classList.toggle('hidden', !show); }
 
+        /* ---------- 高清封面 ---------- */
+        function setCover(pic) {
+          currentPic = pic || '';
+          if (!pic) { elCover.classList.add('opacity-0'); return; }
+          elCover.classList.remove('opacity-0');
+          if (coverCache[pic]) { elCover.src = coverCache[pic]; return; }
+          elCover.src = pic;                     // 先显示缩略图，避免空白
+          fetch(pic, { method: 'HEAD' })         // 跟随跳转拿到网易云真实地址
+            .then(function (res) {
+              var real = res.url || '';
+              if (real.indexOf('music.126.net') === -1) return;
+              var hd = real.replace(/param=\d+y\d+/, 'param=' + COVER_SIZE);
+              coverCache[pic] = hd;
+              if (currentPic === pic) elCover.src = hd;
+            })
+            .catch(function () {});
+        }
+
+        /* ---------- 拉取指定歌单 ---------- */
+        function fetchPlaylist(id) {
+          return new Promise(function (resolve, reject) {
+            var i = 0;
+            function next() {
+              if (i >= APIS.length) { reject(new Error('all api failed')); return; }
+              var api = APIS[i++];
+              var url = api.replace(':server', 'netease').replace(':type', 'playlist')
+                           .replace(':id', id).replace(':r', Math.random());
+              fetch(url)
+                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(function (data) {
+                  if (!Array.isArray(data) || !data.length) throw new Error('empty');
+                  resolve(data.map(function (item) {
+                    return {
+                      name: item.title || item.name || 'Unknown',
+                      artist: item.author || item.artist || 'Unknown',
+                      url: item.url,
+                      pic: item.pic || item.cover || '',
+                      lrc: item.lrc
+                    };
+                  }));
+                })
+                .catch(function () { next(); });
+            }
+            next();
+          });
+        }
+
+        /* ---------- 歌单标签 ---------- */
+        function renderTabs() {
+          var html = '';
+          for (var i = 0; i < PLAYLISTS.length; i++) {
+            html += '<button type="button" class="mp-tab' + (i === 0 ? ' active' : '') + '" data-i="' + i + '">' + esc(PLAYLISTS[i].name) + '</button>';
+          }
+          elTabs.innerHTML = html;
+          var btns = elTabs.querySelectorAll('.mp-tab');
+          for (var j = 0; j < btns.length; j++) {
+            btns[j].addEventListener('click', function () {
+              if (this.classList.contains('active')) return;
+              switchPlaylist(parseInt(this.getAttribute('data-i'), 10), this);
+            });
+          }
+        }
+
+        function switchPlaylist(idx, btn) {
+          var conf = PLAYLISTS[idx];
+          if (!conf) return;
+          var btns = elTabs.querySelectorAll('.mp-tab');
+          for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i] === btn);
+          elMsg.textContent = '正在加载「' + conf.name + '」…';
+          fetchPlaylist(conf.id).then(function (tracks) {
+            var arr = mgr.getState().playlist;   // 拿到引擎当前的歌单数组
+            arr.length = 0;                      // 清空
+            for (var k = 0; k < tracks.length; k++) arr.push(tracks[k]);  // 换成新歌单
+            listKey = ''; lrcKey = '';
+            mgr.loadTrack(0, true);              // 从头播放
+            elMsg.textContent = '';
+            renderAll();
+          }).catch(function () {
+            elMsg.textContent = '歌单加载失败，请稍后再试';
+          });
+        }
+
+        /* ---------- 歌曲列表 ---------- */
         function renderList(st) {
           var list = st.playlist || [];
           var key = list.length + '|' + ((list[0] && list[0].url) || '');
@@ -166,10 +276,10 @@ import { Icon } from "astro-icon/components";
                 var t = list[i] || {};
                 html += '<button type="button" class="mp-item group flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-white/5" data-index="' + i + '">' +
                   '<span class="w-6 shrink-0 text-center font-mono text-xs text-neutral-400">' + (i + 1) + '</span>' +
-                  '<img class="h-10 w-10 shrink-0 rounded-lg bg-neutral-200 object-cover dark:bg-neutral-800" src="' + esc(t.cover || t.pic || '') + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'" />' +
+                  '<img class="h-10 w-10 shrink-0 rounded-lg bg-neutral-200 object-cover dark:bg-neutral-800" src="' + esc(t.pic || '') + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'" />' +
                   '<span class="min-w-0 flex-1">' +
-                    '<span class="mp-item-title block truncate text-sm font-medium text-neutral-700 dark:text-neutral-200">' + esc(t.name || t.title || '未知歌曲') + '</span>' +
-                    '<span class="block truncate text-xs text-neutral-400">' + esc(t.artist || t.author || '未知歌手') + '</span>' +
+                    '<span class="mp-item-title block truncate text-sm font-medium text-neutral-700 dark:text-neutral-200">' + esc(t.name || '未知歌曲') + '</span>' +
+                    '<span class="block truncate text-xs text-neutral-400">' + esc(t.artist || '未知歌手') + '</span>' +
                   '</span>' +
                   '<span class="mp-eq shrink-0 items-end gap-[2px]"><i></i><i></i><i></i></span>' +
                 '</button>';
@@ -187,6 +297,7 @@ import { Icon } from "astro-icon/components";
           for (var k = 0; k < all.length; k++) all[k].classList.toggle('mp-active', k === st.currentIndex);
         }
 
+        /* ---------- 歌词 ---------- */
         function renderLyrics(st, status) {
           var lyrics = st.lyrics || [];
           var key = lyrics.length + '|' + (lyrics[0] ? lyrics[0].text : '') + '|' + (status || '');
@@ -218,13 +329,13 @@ import { Icon } from "astro-icon/components";
           }
         }
 
+        /* ---------- 歌曲信息 / 时间 / 状态 ---------- */
         function renderTrack(st) {
           var t = st.track;
-          if (!t) { elTitle.textContent = '未播放'; elArtist.textContent = '—'; elCover.classList.add('opacity-0'); return; }
-          elTitle.textContent = t.name || t.title || '未知歌曲';
-          elArtist.textContent = t.artist || t.author || '未知歌手';
-          var cover = t.cover || t.pic || '';
-          if (cover) { elCover.src = cover; elCover.classList.remove('opacity-0'); } else { elCover.classList.add('opacity-0'); }
+          if (!t) { elTitle.textContent = '未播放'; elArtist.textContent = '—'; setCover(''); return; }
+          elTitle.textContent = t.name || '未知歌曲';
+          elArtist.textContent = t.artist || '未知歌手';
+          setCover(t.pic || '');
         }
 
         function renderTime(st) {
@@ -252,6 +363,7 @@ import { Icon } from "astro-icon/components";
           renderTime(st); renderPlay(st); renderMode(st); renderVolume(st);
         }
 
+        /* ---------- 交互 ---------- */
         elPlay.addEventListener('click', function () { mgr.togglePlay(); });
         elPrev.addEventListener('click', function () { mgr.playPrev(); });
         elNext.addEventListener('click', function () { mgr.playNext(); });
@@ -306,6 +418,7 @@ import { Icon } from "astro-icon/components";
           clearInterval(timer);
         };
 
+        renderTabs();
         try { mgr.init(); } catch (e) {}
         renderAll();
         setTimeout(renderAll, 800);
@@ -317,6 +430,17 @@ import { Icon } from "astro-icon/components";
 </MainGridLayout>
 
 <style is:global>
+  .mp-tab {
+    border-radius: 9999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: inherit;
+    background: rgba(127, 127, 127, 0.12);
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .mp-tab:hover { background: rgba(127, 127, 127, 0.22); }
+  .mp-tab.active { background: var(--primary); color: #fff; }
+
   .mp-item.mp-active { background: rgba(127, 127, 127, 0.12); }
   .mp-item.mp-active .mp-item-title { color: var(--primary); }
 
