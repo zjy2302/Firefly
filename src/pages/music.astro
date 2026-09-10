@@ -6,15 +6,18 @@ import { Icon } from "astro-icon/components";
 const PLAYLIST_ID = "6864596707";
 // Meting API（:server / :type / :id / :r 会被自动替换）
 const METING_API = "https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r";
-// 播放器主题色（想换就改这个色值）
+// 播放器主题色
 const THEME = "#2f9e8f";
 ---
 
 <MainGridLayout title="音乐" description="我的网易云歌单">
+
+  <!-- APlayer 样式（放在布局内部，位置才合法） -->
+  <link rel="stylesheet" href="/assets/vendor/APlayer.min.css" />
+
   <div class="flex w-full rounded-(--radius-large) overflow-hidden relative">
     <div class="card-base z-10 px-6 py-8 relative w-full">
 
-      <!-- 标题 -->
       <div class="flex items-center gap-3 mb-2">
         <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
           <Icon name="material-symbols:music-note" class="text-[1.5rem]"></Icon>
@@ -25,7 +28,6 @@ const THEME = "#2f9e8f";
         点播放开始 ｜ 点歌词按钮看词（含翻译）｜ 下方是完整歌单列表
       </p>
 
-      <!-- 播放器 -->
       <div class="music-player-shell">
         <meting-js
           server="netease"
@@ -42,7 +44,6 @@ const THEME = "#2f9e8f";
           storage-name="firefly-music-page"></meting-js>
       </div>
 
-      <!-- 保留 Mineradio 跳转 -->
       <div class="mt-8 pt-6 border-t border-(--line-divider)">
         <a
           href="https://mineradio.art/"
@@ -57,30 +58,26 @@ const THEME = "#2f9e8f";
 
     </div>
   </div>
+
+  <!-- 防止和侧边栏播放器同时出声 -->
+  <script is:inline>
+    document.addEventListener('play', function (e) {
+      var all = document.querySelectorAll('audio');
+      for (var i = 0; i < all.length; i++) {
+        if (all[i] !== e.target) { try { all[i].pause(); } catch (err) {} }
+      }
+    }, true);
+  </script>
+
+  <!-- 顺序不能颠倒：先 APlayer，再 MetingJS -->
+  <script is:inline src="/assets/vendor/APlayer.min.js"></script>
+  <script is:inline src="/assets/vendor/Meting.min.js"></script>
+
 </MainGridLayout>
 
-<!-- APlayer 样式（本站文件，不走 CDN） -->
-<link rel="stylesheet" href="/assets/vendor/APlayer.min.css" />
-
-<!-- 防止和侧边栏播放器同时出声 -->
-<script is:inline>
-  document.addEventListener('play', function (e) {
-    var all = document.querySelectorAll('audio');
-    for (var i = 0; i < all.length; i++) {
-      if (all[i] !== e.target) { try { all[i].pause(); } catch (err) {} }
-    }
-  }, true);
-</script>
-
-<!-- 顺序不能颠倒：先 APlayer，再 MetingJS -->
-<script is:inline src="/assets/vendor/APlayer.min.js"></script>
-<script is:inline src="/assets/vendor/Meting.min.js"></script>
-
 <style is:global>
-  /* 去掉 APlayer 默认外边距 */
   .music-player-shell .aplayer { margin: 0; border-radius: 12px; }
 
-  /* 深色模式适配 */
   :root.dark .aplayer { background: #262626; color: #e5e5e5; }
   :root.dark .aplayer .aplayer-info { border-bottom-color: #3a3a3a; }
   :root.dark .aplayer .aplayer-music .aplayer-title { color: #f5f5f5; }
