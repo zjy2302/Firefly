@@ -15,6 +15,13 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 
 	// 主页
 	links.push(LinkPresets.Home);
+	
+		// 音乐页面
+	links.push({
+		name: "音乐",
+		url: "/music/",
+		icon: "material-symbols:music-note",
+	});
 
 	// 文章及其子菜单
 	links.push({

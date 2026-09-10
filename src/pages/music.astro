@@ -1,0 +1,61 @@
+---
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import { Icon } from "astro-icon/components";
+
+// 你的网易云歌单 ID
+const PLAYLIST_ID = "6864596707";
+// Meting API 地址（:server / :type / :id 会被自动替换）
+const METING_API = "https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r";
+---
+
+<MainGridLayout title="音乐" description="我的网易云歌单">
+  <div class="flex w-full rounded-(--radius-large) overflow-hidden relative">
+    <div class="card-base z-10 px-6 py-8 relative w-full">
+      <!-- 标题 -->
+      <div class="flex items-center gap-3 mb-2">
+        <div class="h-8 w-8 rounded-lg bg-(--primary) flex items-center justify-center text-white dark:text-black/70">
+          <Icon name="material-symbols:music-note" class="text-[1.5rem]"></Icon>
+        </div>
+        <h1 class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">我的歌单</h1>
+      </div>
+      <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-6">
+        直接点播放就能听，点左下角列表图标可以展开完整歌单。
+      </p>
+
+      <!-- 音乐播放器 -->
+      <meting-js
+        server="netease"
+        type="playlist"
+        id={PLAYLIST_ID}
+        api={METING_API}
+        order="list"
+        preload="none"
+        mutex="true"
+        list-folded="true">
+      </meting-js>
+
+      <!-- 底部：Mineraio 网页版入口 -->
+      <div class="mt-8 pt-6 border-t border-(--line-divider)">
+        <a
+          href="https://mineradio.art/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-(--primary) text-white dark:text-black/70 rounded-lg font-medium hover:bg-(--primary)/90 active:scale-95 transition-all"
+        >
+          <Icon name="material-symbols:play-circle" class="text-lg" />
+          <span>打开 Mineradio 网页版（需装 Bridge 扩展）</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</MainGridLayout>
+
+<!-- APlayer 样式和脚本（MetingJS 依赖 APlayer，顺序不能颠倒） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.css" />
+<script is:inline src="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.js"></script>
+<script is:inline src="https://cdn.jsdelivr.net/npm/meting@2.0.1/dist/Meting.min.js"></script>
+
+<style is:global>
+  meting-js { display: block; }
+  .aplayer { margin: 0 !important; }
+</style>
