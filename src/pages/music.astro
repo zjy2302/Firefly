@@ -135,8 +135,8 @@ import { Icon } from "astro-icon/components";
 
       // Meting 接口（依次尝试，哪个通用哪个）
       var APIS = [
-        'https://api.injahow.cn/meting/?server=:server&type=:type&id=:id',
         'https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id',
+        'https://api.injahow.cn/meting/?server=:server&type=:type&id=:id',
         'https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r'
       ];
 
@@ -198,31 +198,65 @@ import { Icon } from "astro-icon/components";
         }
 
         /* ---------- 拉取指定歌单 ---------- */
+        var PLAYLIST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+        var PLAYLIST_TIMEOUT_MS = 8000;
+
+        function fetchMetingJson(url, controllers) {
+          var controller = new AbortController();
+          controllers.push(controller);
+          var timeout = setTimeout(function () { controller.abort(); }, PLAYLIST_TIMEOUT_MS);
+          return fetch(url, { signal: controller.signal })
+            .then(function (r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .finally(function () { clearTimeout(timeout); });
+        }
+
         function fetchPlaylist(id) {
-          return new Promise(function (resolve, reject) {
-            var i = 0;
-            function next() {
-              if (i >= APIS.length) { reject(new Error('all api failed')); return; }
-              var api = APIS[i++];
-              var url = api.replace(':server', 'netease').replace(':type', 'playlist')
-                           .replace(':id', id).replace(':r', Math.random());
-              fetch(url)
-                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-                .then(function (data) {
-                  if (!Array.isArray(data) || !data.length) throw new Error('empty');
-                  resolve(data.map(function (item) {
-                    return {
-                      name: item.title || item.name || 'Unknown',
-                      artist: item.author || item.artist || 'Unknown',
-                      url: item.url,
-                      pic: item.pic || item.cover || '',
-                      lrc: item.lrc
-                    };
-                  }));
-                })
-                .catch(function () { next(); });
+          var cacheKey = 'firefly-meting:netease:playlist:' + id;
+          var staleTracks = null;
+
+          try {
+            var cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+            if (cached && Array.isArray(cached.playlist) && cached.playlist.length > 0) {
+              if (Date.now() - cached.time < PLAYLIST_CACHE_TTL_MS) {
+                return Promise.resolve(cached.playlist);
+              }
+              staleTracks = cached.playlist;
             }
-            next();
+          } catch (e) {
+            console.warn('Invalid playlist cache, ignoring it.', e);
+          }
+
+          var controllers = [];
+          return Promise.any(APIS.map(function (baseApi) {
+            var url = baseApi.replace(':server', 'netease').replace(':type', 'playlist')
+                             .replace(':id', id).replace(':r', Math.random());
+            return fetchMetingJson(url, controllers).then(function (data) {
+              if (!Array.isArray(data) || !data.length) throw new Error('empty');
+              return data.map(function (item) {
+                return {
+                  name: item.title || item.name || 'Unknown',
+                  artist: item.author || item.artist || 'Unknown',
+                  url: item.url,
+                  pic: item.pic || item.cover || '',
+                  lrc: item.lrc
+                };
+              });
+            });
+          })).then(function (tracks) {
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify({ time: Date.now(), playlist: tracks }));
+            } catch (e) {
+              console.warn('Unable to cache playlist.', e);
+            }
+            return tracks;
+          }).catch(function (e) {
+            if (staleTracks) return staleTracks;
+            throw e;
+          }).finally(function () {
+            controllers.forEach(function (controller) { controller.abort(); });
           });
         }
 
